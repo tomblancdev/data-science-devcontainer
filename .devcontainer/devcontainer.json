@@ -1,0 +1,135 @@
+// Portable data-science dev container (Docker Compose-based).
+// Build, mounts, ports, env and secrets live in compose.yaml — this file just
+// wires up VS Code (interpreter, extensions, settings, features).
+// Docs: https://containers.dev/implementors/json_reference/
+{
+  "name": "Data Science (uv · ruff · polars · duckdb)",
+
+  // Runtime is defined by Compose.
+  // Rootless Podman: add the override -> ["compose.yaml", "compose.podman.yaml"]
+  "dockerComposeFile": ["compose.yaml"],
+  "service": "app",
+  "workspaceFolder": "/workspaces/data-science",
+
+  // Respect `command: sleep infinity` from compose instead of overriding it.
+  "overrideCommand": false,
+
+  // Stop the compose project when the window closes, so stale containers don't
+  // linger and hold resources across rebuilds.
+  "shutdownAction": "stopCompose",
+
+  // Extra dev-container features layered on top of the image.
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "username": "vscode"
+    },
+    // `just` — a modern, ergonomic command runner (see ../justfile).
+    "ghcr.io/guiyomh/features/just:0": {}
+  },
+
+  // Build the locked environment + register the Jupyter kernel after create.
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+
+  // VS Code forwards these dynamically and auto-picks a free local port if one
+  // is taken — avoids the hard-bind "port already allocated" clashes you get
+  // when publishing fixed ports in compose (e.g. on rebuild, or vs other stacks).
+  "forwardPorts": [8888, 2718, 8501],
+  "portsAttributes": {
+    "8888": { "label": "JupyterLab", "onAutoForward": "notify" },
+    "2718": { "label": "marimo", "onAutoForward": "notify" },
+    "8501": { "label": "Streamlit", "onAutoForward": "silent" }
+  },
+
+  "remoteUser": "vscode",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // --- Python core ---
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.debugpy",
+        "KevinRose.vsc-python-indent",
+        "njpwerner.autodocstring",
+
+        // --- Ruff: lint + format in Rust (replaces black/flake8/isort/pylint) ---
+        "charliermarsh.ruff",
+
+        // --- Notebooks ---
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-renderers",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.vscode-jupyter-slideshow",
+
+        // --- Interactive data exploration (point-and-click on a DataFrame) ---
+        "ms-toolsai.datawrangler",
+
+        // --- Tabular / SQL viewers ---
+        "mechatroner.rainbow-csv",
+        "GrapeCity.gc-excelviewer",
+        "mtxr.sqltools",
+
+        // --- Config formats ---
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "editorconfig.editorconfig",
+
+        // --- Git + quality of life ---
+        "eamodio.gitlens",
+        "streetsidesoftware.code-spell-checker",
+
+        // --- Icon suite ---
+        "PKief.material-icon-theme"
+      ],
+
+      "settings": {
+        "workbench.iconTheme": "material-icon-theme",
+        "terminal.integrated.defaultProfile.linux": "zsh",
+
+        // Ruff drives all Python formatting + autofix on save.
+        "editor.formatOnSave": true,
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
+        },
+        "ruff.importStrategy": "fromEnvironment",
+
+        // Interpreter is the uv-managed project venv, surfaced as ./.venv by
+        // postCreate (a symlink to /home/vscode/.venv). venvFolders is a backup
+        // hint so discovery finds it even before the symlink exists.
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "python.venvFolders": ["/home/vscode"],
+        "python.terminal.activateEnvironment": false,
+        "python.testing.pytestEnabled": true,
+        "python.analysis.typeCheckingMode": "basic",
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.inlayHints.functionReturnTypes": true,
+        "python.analysis.inlayHints.variableTypes": true,
+
+        // Notebooks: format + fix on save, clean diffs.
+        "notebook.formatOnSave.enabled": true,
+        "notebook.defaultFormatter": "charliermarsh.ruff",
+        "notebook.codeActionsOnSave": {
+          "notebook.source.fixAll.ruff": "explicit",
+          "notebook.source.organizeImports.ruff": "explicit"
+        },
+        "notebook.lineNumbers": "on",
+        "notebook.output.textLineLimit": 60,
+        "jupyter.askForKernelRestart": false,
+
+        "files.exclude": {
+          "**/__pycache__": true,
+          "**/.pytest_cache": true,
+          "**/.ruff_cache": true,
+          "**/.mypy_cache": true,
+          "**/.ipynb_checkpoints": true
+        }
+      }
+    }
+  }
+}

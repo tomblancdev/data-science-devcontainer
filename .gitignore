@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+build/
+dist/
+
+# Environments & locks managed by tools
+.venv
+.venv/
+.env
+
+# Container secrets (mounted via compose `secrets:`)
+.devcontainer/secrets/
+
+# uv / ruff / mypy / pytest caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/_generated/
+
+# marimo
+__marimo__/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Data — keep raw/processed data out of version control by default
+# (ignore the dir's *contents* but keep the placeholder so the folder ships)
+data/*
+!data/.gitkeep
+outputs/
+*.csv
+*.parquet
+*.xlsx
+*.db
+*.sqlite

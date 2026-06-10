@@ -1,0 +1,17 @@
+# Rootless Podman overrides — merge AFTER compose.yaml in devcontainer.json:
+#
+#   "dockerComposeFile": ["compose.yaml", "compose.podman.yaml"]
+#
+# Why: under rootless Podman the default user namespace remaps IDs, so files
+# created in bind mounts end up owned by the wrong UID and become unwritable.
+# `keep-id` maps the in-container user to YOUR host UID/GID, keeping mounted
+# files owned by you. This value is Podman-specific and is rejected by Docker —
+# that's exactly why it lives in this opt-in override and not in compose.yaml.
+services:
+  app:
+    userns_mode: keep-id
+
+    # On SELinux-enforcing hosts (Fedora/RHEL), let the container read/write
+    # bind mounts without relabeling them. Remove if you don't run SELinux.
+    security_opt:
+      - label=disable

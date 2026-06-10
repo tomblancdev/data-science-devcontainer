@@ -1,0 +1,113 @@
+[project]
+name = "ds-workspace"
+version = "0.1.0"
+description = "Portable, batteries-included data-science dev environment."
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    # Fast dataframes & in-process query engines
+    "polars>=1.7",         # Rust-backed DataFrame, lazy + multithreaded
+    "duckdb>=1.1",         # in-process OLAP SQL on Parquet/CSV/Arrow
+    "pyarrow>=17",         # zero-copy columnar interchange
+    "pandas>=2.2",         # still the lingua franca
+    "numpy>=2.0",
+    "narwhals>=1.9",       # write df code once, run on polars *or* pandas
+
+    # Notebooks
+    "jupyterlab>=4.2",
+    "ipykernel>=6.29",
+    "jupytext>=1.16",      # pair .ipynb <-> .py for clean diffs
+    "marimo>=0.9",         # reactive, git-friendly notebooks (pure .py)
+
+    # Visualization
+    "altair>=5.4",         # declarative, grammar-of-graphics
+    "plotly>=5.24",        # interactive charts
+    "matplotlib>=3.9",
+    "seaborn>=0.13",
+    "great-tables>=0.12",  # publication-quality tables
+
+    # IO / utilities
+    "openpyxl>=3.1",       # .xlsx read/write
+    "python-dotenv>=1.0",
+    "pydantic>=2.9",
+    "rich>=13.8",
+    "tqdm>=4.66",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+ml  = ["scikit-learn>=1.5", "statsmodels>=0.14"]
+db  = ["sqlalchemy>=2.0", "psycopg[binary]>=3.2", "connectorx>=0.4"]
+geo = ["geopandas>=1.0", "shapely>=2.0"]
+
+# PEP 735 dev tooling — always installed by `uv sync --dev`.
+[dependency-groups]
+dev = [
+    "ruff>=0.6",           # lint + format (replaces black/flake8/isort/pylint)
+    "mypy>=1.11",          # stable static typing
+    "pytest>=8.3",
+    "pytest-cov>=5.0",
+    "pre-commit>=3.8",
+    "nbqa>=1.9",           # run ruff/mypy *inside* notebooks
+    "nbstripout>=0.7",     # strip notebook outputs before commit
+    "ipython>=8.27",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ds_workspace"]
+
+# --------------------------------------------------------------------------- #
+# uv
+# --------------------------------------------------------------------------- #
+[tool.uv]
+# `ty` (Astral's new Rust type checker) is preview — run on demand with
+# `uvx ty check` (see justfile) instead of pinning it into the lockfile.
+
+# --------------------------------------------------------------------------- #
+# Ruff — linter + formatter
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = [".venv", "notebooks/_generated"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "UP",       # pyupgrade
+    "B",        # flake8-bugbear
+    "SIM",      # flake8-simplify
+    "C4",       # flake8-comprehensions
+    "PD",       # pandas-vet
+    "NPY",      # numpy-specific
+    "RUF",      # ruff-specific
+]
+ignore = ["E501"]  # line length is enforced by the formatter
+
+[tool.ruff.lint.per-file-ignores]
+"**/*.ipynb" = ["E402", "F401"]  # imports after code / unused are fine in notebooks
+"tests/**"   = ["S101"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# --------------------------------------------------------------------------- #
+# mypy / pytest
+# --------------------------------------------------------------------------- #
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+plugins = []
+
+[tool.pytest.ini_options]
+addopts = "-ra --cov=src --cov-report=term-missing"
+testpaths = ["tests"]

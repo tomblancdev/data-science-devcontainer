@@ -1,0 +1,73 @@
+# Compose definition for the dev container.
+# Owns: build, mounts, ports, environment, secrets, runtime options.
+# Wired into VS Code by devcontainer.json via `dockerComposeFile`.
+#
+# Rootless Podman? Merge the override so the container user maps to your host
+# user and bind-mounted files stay writable (see compose.podman.yaml):
+#   "dockerComposeFile": ["compose.yaml", "compose.podman.yaml"]
+name: ds-devcontainer
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+      args:
+        PYTHON_VERSION: "3.13"
+        # Behind a corporate proxy at BUILD time? Set these in your shell or
+        # .env and they'll flow into the build (uv/pip/apt honor them):
+        #   HTTP_PROXY / HTTPS_PROXY / NO_PROXY
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
+
+    # Keep the container running for the dev session (overrides the image CMD).
+    command: sleep infinity
+    init: true
+
+    # --- Environment -------------------------------------------------------
+    environment:
+      UV_LINK_MODE: copy
+      UV_PROJECT_ENVIRONMENT: /home/vscode/.venv
+      UV_CACHE_DIR: /home/vscode/.cache/uv
+      # Env is baked at build time; never attempt to fetch CPython at runtime
+      # (fails fast with a clear message instead of hanging on DNS).
+      UV_PYTHON_DOWNLOADS: never
+
+    # Non-secret config + local dev vars. Optional & git-ignored — copy
+    # .env.example -> .env to use it.
+    env_file:
+      - path: ../.env
+        required: false
+
+    # --- Ports -------------------------------------------------------------
+    # Deliberately NOT published with `ports:` here. Hard host-port binds cause
+    # "port is already allocated" on rebuild (the old container still holds
+    # them) and clash with other stacks. Instead `expose` documents the
+    # container-side ports, and VS Code forwards them dynamically via
+    # `forwardPorts` in devcontainer.json — auto-picking a free local port if
+    # one is taken, so rebuilds never collide.
+    expose:
+      - "8888"   # JupyterLab
+      - "2718"   # marimo
+      - "8501"   # Streamlit
+
+    # --- Mounts ------------------------------------------------------------
+    volumes:
+      # Project source bind-mounted into the workspace.
+      - ..:/workspaces/data-science:cached
+      # Persist uv's global cache across rebuilds.
+      - uv-cache:/home/vscode/.cache/uv
+
+    # --- Secrets -----------------------------------------------------------
+    # File-based secrets are mounted read-only at /run/secrets/<name>.
+    # Uncomment this and the top-level `secrets:` block, then create the file.
+    # secrets:
+    #   - openai_api_key
+
+# secrets:
+#   openai_api_key:
+#     file: ./secrets/openai_api_key.txt
+
+volumes:
+  uv-cache:
