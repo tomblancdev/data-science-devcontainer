@@ -9,10 +9,13 @@ stack with no host setup beyond Docker.
 
 ## Quick start
 
-1. Install **Docker** + the VS Code **Dev Containers** extension
-   (`ms-vscode-remote.remote-containers`).
+1. Install **Docker Desktop** (Windows/macOS) or Docker/Podman (Linux) + the VS
+   Code **Dev Containers** extension (`ms-vscode-remote.remote-containers`).
+   The default config is **Dockerfile-based — no `docker compose` required**.
 2. Open this folder in VS Code → **"Reopen in Container"**.
-3. Wait for the one-time build + `uv sync`, then:
+   (If prompted, pick **"Data Science (uv · ruff · polars · duckdb)"** — the
+   plain Dockerfile config. A Compose variant is also offered; see below.)
+3. Wait for the one-time build, then:
 
    ```bash
    just            # list all tasks
@@ -42,35 +45,52 @@ stack with no host setup beyond Docker.
 ```
 .
 ├── .devcontainer/
-│   ├── devcontainer.json    # VS Code wiring: features, extensions, settings
-│   ├── compose.yaml         # runtime: build, mounts, ports, env, secrets
-│   ├── compose.podman.yaml  # opt-in rootless-Podman override (userns keep-id)
-│   ├── Dockerfile           # base + uv + native libs + managed CPython
-│   └── postCreate.sh        # uv sync, kernel registration, pre-commit
+│   ├── devcontainer.json     # DEFAULT: Dockerfile-based, no Compose (Windows-friendly)
+│   ├── Dockerfile            # base + uv + native libs + CPython + venv baked at build
+│   ├── postCreate.sh         # kernel registration, ./.venv symlink, git hooks
+│   ├── compose.yaml          # optional Compose variant: build, mounts, env, secrets
+│   ├── compose.podman.yaml   # Compose: rootless-Podman override (userns keep-id)
+│   └── compose/
+│       └── devcontainer.json # optional "… (Compose)" config (shown in the picker)
 ├── notebooks/00-welcome.ipynb
-├── src/ds_workspace/       # importable, testable helpers
-├── tests/                  # pytest smoke tests
-├── data/                   # git-ignored local data
-├── pyproject.toml          # deps, extras, ruff/mypy/pytest config
+├── src/ds_workspace/         # importable, testable helpers
+├── tests/                    # pytest smoke tests
+├── data/                     # git-ignored local data (placeholder ships)
+├── pyproject.toml            # deps, extras, ruff/mypy/pytest config
+├── .gitattributes            # force LF endings — Windows-safe shell scripts
 ├── .pre-commit-config.yaml
-└── justfile                # task shortcuts
+└── justfile                  # task shortcuts
 ```
 
-## Container engine
+## Container engine & variants
 
-The dev container is **Compose-based**: `compose.yaml` owns the build, bind
-mounts, published ports, environment, and secrets. `devcontainer.json` only
-wires up VS Code. (Note: because it uses Compose, `runArgs` is ignored — runtime
-flags belong in the compose file.)
+Two ways to run it — VS Code shows a picker on "Reopen in Container":
 
-- **Environment** — `compose.yaml` reads an optional `../.env` (copy
-  `.env.example` → `.env`).
-- **Secrets** — uncomment the `secrets:` blocks in `compose.yaml`; the file is
-  mounted read-only at `/run/secrets/<name>` and never lands in an image layer.
-- **Ports** — `compose.yaml` only `expose`s them (no host bind); VS Code
-  forwards them via `forwardPorts` in `devcontainer.json` and auto-picks a free
-  local port if one's taken. This avoids "port already allocated" errors on
-  rebuild and clashes with other running stacks.
+1. **Dockerfile (default, recommended).** Just `devcontainer.json`, **no Docker
+   Compose required**. Works out of the box on Windows / macOS / Linux with
+   Docker Desktop, Podman, or Rancher Desktop. Mounts, ports and env are set
+   directly in `devcontainer.json`.
+2. **Compose** (`.devcontainer/compose/devcontainer.json`). Use this if you want
+   compose-managed secrets or plan to add more services; runtime lives in
+   `compose.yaml`.
+
+- **Environment** — Dockerfile variant: `containerEnv` in `devcontainer.json`.
+  Compose variant: `environment:` + an optional `../.env` (copy `.env.example`).
+- **Secrets** — Compose variant has a `secrets:` block (mounted at
+  `/run/secrets/<name>`, never baked into an image layer). For the Dockerfile
+  variant, mount a file via `mounts`.
+- **Ports** — both only **forward** (never hard-publish) via `forwardPorts`, so
+  VS Code auto-picks a free local port and rebuilds never hit "port already
+  allocated".
+
+### Windows notes
+
+- Use **Docker Desktop** (WSL2 backend) — the default config needs no
+  `docker compose`. Podman Desktop / Rancher Desktop work too.
+- `.gitattributes` forces **LF** line endings so `postCreate.sh` runs inside the
+  Linux container (CRLF would break it with `$'\r': command not found`). If you
+  cloned *before* `.gitattributes` existed, normalize once:
+  `git add --renormalize . && git checkout .` (or just re-clone).
 
 ### Networking: build vs. runtime
 
@@ -94,17 +114,21 @@ Jupyter kernel and git hooks.
 
 ### Running on Podman (rootless)
 
-`--userns=keep-id` can't go through `runArgs` (Compose ignores it), and
-`userns_mode: keep-id` is Podman-only (Docker rejects it), so it lives in an
-opt-in override. Enable it by listing both files in `devcontainer.json`:
+So bind-mounted files stay writable, map the container user to your host UID:
 
-```jsonc
-"dockerComposeFile": ["compose.yaml", "compose.podman.yaml"]
-```
+- **Dockerfile variant** — uncomment in `devcontainer.json`:
+  ```jsonc
+  "runArgs": ["--userns=keep-id"]
+  ```
+- **Compose variant** — list both files in the Compose config's
+  `dockerComposeFile` (Compose ignores `runArgs`, so the override carries it):
+  ```jsonc
+  "dockerComposeFile": ["../compose.yaml", "../compose.podman.yaml"]
+  ```
+  `compose.podman.yaml` adds `userns_mode: keep-id` + `security_opt:
+  [label=disable]` (SELinux hosts).
 
-`compose.podman.yaml` adds `userns_mode: keep-id` (maps the container user to
-your host UID so bind-mounted files stay writable) plus `security_opt:
-[label=disable]` for SELinux hosts. On Docker, just leave it out.
+On Docker / Docker Desktop, leave both off.
 
 ## Common tweaks
 

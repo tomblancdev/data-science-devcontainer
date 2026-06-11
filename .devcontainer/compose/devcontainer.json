@@ -1,22 +1,22 @@
-// Portable data-science dev container — Dockerfile-based (NO Docker Compose).
-// This is the simplest, most portable option and works out of the box on
-// Windows / macOS / Linux with Docker Desktop (or Podman / Rancher Desktop).
+// OPTIONAL Compose variant of the dev container.
+// The DEFAULT (../devcontainer.json) is Dockerfile-based and needs no Compose —
+// prefer it unless you specifically want compose-managed secrets or extra
+// services. Runtime (build, mounts, env, secrets) lives in ../compose.yaml.
 //
-// Prefer Compose (e.g. for compose-managed secrets, or multi-service setups)?
-// When you "Reopen in Container", VS Code offers a picker — choose the
-// "… (Compose)" config defined in .devcontainer/compose/.
-// Docs: https://containers.dev/implementors/json_reference/
+// Rootless Podman: add the override ->
+//   "dockerComposeFile": ["../compose.yaml", "../compose.podman.yaml"]
 {
-  "name": "Data Science (uv · ruff · polars · duckdb)",
+  "name": "Data Science (Compose) (uv · ruff · polars · duckdb)",
 
-  "build": {
-    "context": "..",
-    "dockerfile": "Dockerfile",
-    "args": {
-      // Override the managed CPython that uv installs (e.g. "3.12").
-      "PYTHON_VERSION": "3.13"
-    }
-  },
+  "dockerComposeFile": ["../compose.yaml"],
+  "service": "app",
+  "workspaceFolder": "/workspaces/data-science",
+
+  // Respect `command: sleep infinity` from compose instead of overriding it.
+  "overrideCommand": false,
+
+  // Stop the compose project when the window closes (no lingering containers).
+  "shutdownAction": "stopCompose",
 
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {
@@ -24,32 +24,8 @@
       "configureZshAsDefaultShell": true,
       "username": "vscode"
     },
-    // `just` — a modern, ergonomic command runner (see ../justfile).
     "ghcr.io/guiyomh/features/just:0": {}
   },
-
-  // Bind the project at the canonical path the image was built against, so the
-  // editable install of the local package resolves no matter what the repo
-  // folder is named on disk.
-  "workspaceFolder": "/workspaces/data-science",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/data-science,type=bind,consistency=cached",
-
-  // Persist uv's cache across rebuilds.
-  "mounts": [
-    "source=ds-uv-cache,target=/home/vscode/.cache/uv,type=volume"
-  ],
-
-  "containerEnv": {
-    "UV_LINK_MODE": "copy",
-    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
-    // Env is baked at build time; never fetch CPython at runtime (fail fast
-    // instead of hanging on a locked-down network).
-    "UV_PYTHON_DOWNLOADS": "never"
-  },
-
-  // Rootless Podman only: uncomment so files on the bind mount stay writable.
-  // Docker rejects this value — leave it commented on Docker Desktop / Windows.
-  // "runArgs": ["--userns=keep-id"],
 
   "postCreateCommand": "bash .devcontainer/postCreate.sh",
 
@@ -106,7 +82,6 @@
         "workbench.iconTheme": "material-icon-theme",
         "terminal.integrated.defaultProfile.linux": "zsh",
 
-        // Ruff drives all Python formatting + autofix on save.
         "editor.formatOnSave": true,
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff",
@@ -117,9 +92,6 @@
         },
         "ruff.importStrategy": "fromEnvironment",
 
-        // Interpreter is the uv-managed project venv, surfaced as ./.venv by
-        // postCreate (a symlink to /home/vscode/.venv). venvFolders is a backup
-        // hint so discovery finds it even before the symlink exists.
         "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
         "python.venvFolders": ["/home/vscode"],
         "python.terminal.activateEnvironment": false,
@@ -129,7 +101,6 @@
         "python.analysis.inlayHints.functionReturnTypes": true,
         "python.analysis.inlayHints.variableTypes": true,
 
-        // Notebooks: format + fix on save, clean diffs.
         "notebook.formatOnSave.enabled": true,
         "notebook.defaultFormatter": "charliermarsh.ruff",
         "notebook.codeActionsOnSave": {

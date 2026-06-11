@@ -1,0 +1,9 @@
+# Normalize line endings to LF on checkout — the container runs Linux, and CRLF
+# would break shell scripts (e.g. .devcontainer/postCreate.sh) on Windows hosts.
+* text=auto eol=lf
+
+# Be explicit for the files that MUST be LF to execute correctly.
+*.sh   text eol=lf
+*.bash text eol=lf
+justfile text eol=lf
+Dockerfile text eol=lf
